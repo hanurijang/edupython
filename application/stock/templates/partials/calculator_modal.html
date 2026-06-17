@@ -1,0 +1,50 @@
+<div id="calculator-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="calc-title">
+    <div class="modal-header">
+      <div>
+        <h2 id="calc-title">계산기</h2>
+        <p>간단 계산</p>
+      </div>
+      <button type="button" class="modal-close" data-modal-close aria-label="닫기">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="calculator">
+        <input
+          type="text"
+          id="calc-display"
+          class="calc-display"
+          readonly
+          value="0"
+          inputmode="decimal"
+          autocomplete="off"
+          aria-label="계산기 숫자 표시"
+        >
+        <div class="calc-keys">
+          <button type="button" class="calc-key calc-fn" data-action="clear">C</button>
+          <button type="button" class="calc-key calc-fn" data-action="back">⌫</button>
+          <button type="button" class="calc-key calc-op" data-value="%">%</button>
+          <button type="button" class="calc-key calc-op" data-value="/">÷</button>
+
+          <button type="button" class="calc-key" data-value="7">7</button>
+          <button type="button" class="calc-key" data-value="8">8</button>
+          <button type="button" class="calc-key" data-value="9">9</button>
+          <button type="button" class="calc-key calc-op" data-value="*">×</button>
+
+          <button type="button" class="calc-key" data-value="4">4</button>
+          <button type="button" class="calc-key" data-value="5">5</button>
+          <button type="button" class="calc-key" data-value="6">6</button>
+          <button type="button" class="calc-key calc-op" data-value="-">−</button>
+
+          <button type="button" class="calc-key" data-value="1">1</button>
+          <button type="button" class="calc-key" data-value="2">2</button>
+          <button type="button" class="calc-key" data-value="3">3</button>
+          <button type="button" class="calc-key calc-op" data-value="+">+</button>
+
+          <button type="button" class="calc-key calc-wide" data-value="0">0</button>
+          <button type="button" class="calc-key" data-value=".">.</button>
+          <button type="button" class="calc-key calc-eq" data-action="equals">=</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

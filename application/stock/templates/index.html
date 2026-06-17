@@ -1,0 +1,1372 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Listing{% endblock %}
+
+{% block extra_css %}
+.index-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.index-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.index-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.index-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.index-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.index-session {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.session-open { background: #dcfce7; color: #166534; }
+.session-closed { background: #f1f5f9; color: #475569; }
+.session-pre { background: #fef9c3; color: #854d0e; }
+.session-after { background: #ffedd5; color: #9a3412; }
+.session-holiday { background: #fee2e2; color: #991b1b; }
+.index-close {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+.index-change {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.index-date {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-subtle);
+  text-align: right;
+}
+.index-up .index-change { color: var(--up); }
+.index-down .index-change { color: var(--down); }
+.index-flat .index-change { color: var(--text-muted); }
+.stat-card .index-card-top { margin-bottom: 6px; }
+.stat-card .index-name { font-size: 13px; color: var(--text-muted); }
+.stat-card .index-close {
+  margin: 0 0 4px;
+  text-align: left;
+  font-size: 26px;
+  font-weight: 800;
+}
+.stat-card .index-date { text-align: left; font-size: 12px; }
+.stat-card.stat-up .index-close { color: var(--up); }
+.stat-card.stat-down .index-close { color: var(--down); }
+.stat-card.stat-flat .index-close { color: var(--text); }
+.top-avg-breakdown {
+  margin: 6px 0 8px;
+  display: grid;
+  gap: 4px;
+}
+.top-avg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+.top-avg-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.top-avg-value {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.top-avg-value.value-up { color: var(--up); }
+.top-avg-value.value-down { color: var(--down); }
+.top-avg-value.value-flat { color: var(--text-muted); }
+.top-avg-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-subtle);
+}
+.sector-avg-breakdown {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.stat-card-sector {
+  grid-column: span 2;
+}
+@media (max-width: 720px) {
+  .stat-card-sector { grid-column: span 1; }
+}
+.index-card-action { cursor: pointer; }
+.index-card-action:hover { border-color: #93c5fd; }
+.limit-list {
+  display: grid;
+  gap: 8px;
+}
+.limit-list-empty {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.limit-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.limit-item-info {
+  min-width: 0;
+}
+.limit-item-name {
+  display: block;
+  font-weight: 600;
+}
+.limit-item-symbol {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.portfolio-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+.portfolio-cards::-webkit-scrollbar {
+  width: 8px;
+}
+.portfolio-cards::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+.portfolio-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+.portfolio-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+}
+.portfolio-card:hover {
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
+  transform: translateY(-0.5px);
+}
+.portfolio-card.active {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+.portfolio-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.portfolio-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.portfolio-card-title h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.portfolio-card-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.portfolio-card-return {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.portfolio-card-return.up { color: var(--up); }
+.portfolio-card-return.down { color: var(--down); }
+.portfolio-card-return.flat { color: var(--text); }
+.portfolio-card-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.portfolio-card-edit {
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  font-size: 10px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.portfolio-card-edit.active {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+.portfolio-card-delete {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+  border-radius: 999px;
+  font-size: 10px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.portfolio-card-delete:hover {
+  background: #ffe4e6;
+}
+.portfolio-card-holdings {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  display: grid;
+  gap: 6px;
+}
+.portfolio-card-holding {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+.portfolio-card-holding-main {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.portfolio-card-holding-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portfolio-card-holding-return {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.portfolio-card-holding-return.change-up { color: var(--up); }
+.portfolio-card-holding-return.change-down { color: var(--down); }
+.portfolio-card-holding-return.change-flat { color: var(--text-muted); }
+.portfolio-card-weight {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.portfolio-card-edit-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.portfolio-card-weight-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.portfolio-card-weight input {
+  width: 52px;
+  padding: 2px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  background: #fff;
+}
+.portfolio-card-holding-remove {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  font-size: 13px;
+  cursor: pointer;
+}
+.portfolio-card-holding-remove:hover {
+  background: #ffe4e6;
+}
+.flow-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.flow-controls-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flow-chart-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+.flow-chart-svg {
+  width: 100%;
+  height: 280px;
+  display: block;
+  cursor: crosshair;
+}
+.flow-chart-svg.is-dragging {
+  cursor: grabbing;
+}
+.flow-legend {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 6px;
+}
+.flow-legend-item {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flow-legend-item.benchmark {
+  color: #94a3b8;
+}
+.flow-axis-label {
+  fill: #94a3b8;
+  font-size: 11px;
+}
+.flow-grid-line {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.flow-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.flow-empty {
+  margin: 0;
+  padding: 26px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.portfolio-cards-empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 14px;
+  align-items: start;
+}
+.dashboard-grid .panel {
+  margin: 0;
+}
+.dashboard-grid .index-cards {
+  margin: 0;
+}
+
+.table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 320px);
+}
+#stock-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+#stock-table th,
+#stock-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  background: var(--surface);
+}
+#stock-table th.num,
+#stock-table td.num {
+  padding: 11px 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#stock-table th.col-name,
+#stock-table td.col-name {
+  padding-left: 10px;
+  padding-right: 16px;
+}
+#stock-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+#stock-table tbody tr:nth-child(even) td { background: #fcfdff; }
+#stock-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition), color var(--transition);
+}
+#stock-table th.sortable:hover {
+  background: #eef2ff;
+  color: var(--primary-strong);
+}
+#stock-table th.sortable::after {
+  content: '↕';
+  color: var(--text-subtle);
+  font-size: 10px;
+  margin-left: 4px;
+}
+#stock-table th.sortable.sorted-asc::after {
+  content: '↑';
+  color: var(--primary-strong);
+}
+#stock-table th.sortable.sorted-desc::after {
+  content: '↓';
+  color: var(--primary-strong);
+}
+#stock-table tbody tr { transition: background-color var(--transition); }
+#stock-table tbody tr:hover td { background: #f8fafc !important; }
+#stock-table tbody tr:hover td.price-up { background: #fef2f2 !important; }
+#stock-table tbody tr:hover td.price-down { background: #eff6ff !important; }
+#stock-table tbody tr:hover td.price-limit-up { background: #fee2e2 !important; }
+#stock-table tbody tr:hover td.price-limit-down { background: #dbeafe !important; }
+#stock-table td.price-up { color: var(--up); font-weight: 600; }
+#stock-table td.price-down { color: var(--down); font-weight: 600; }
+#stock-table td.price-flat { color: var(--text); }
+#stock-table td.price-limit-up { color: var(--up); font-weight: 700; }
+#stock-table td.price-limit-down { color: var(--down); font-weight: 700; }
+#stock-table .empty-row td {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 48px 24px;
+  white-space: normal;
+  background: var(--surface-muted) !important;
+}
+#stock-table th.col-portfolio,
+#stock-table td.col-portfolio {
+  width: 40px;
+  padding: 11px 6px;
+  text-align: center;
+}
+.portfolio-star {
+  background: none;
+  border: none;
+  padding: 4px;
+  font-size: 17px;
+  line-height: 1;
+  color: #cbd5e1;
+  transition: color var(--transition), transform 0.1s ease;
+}
+.portfolio-star:hover {
+  color: #94a3b8;
+  transform: scale(1.1);
+}
+.portfolio-star.is-portfolio { color: #facc15; }
+.portfolio-star.is-portfolio:hover { color: #eab308; }
+.portfolio-star:focus-visible {
+  outline: 2px solid #fde68a;
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+.company-link {
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 4px 8px;
+  margin: -4px -8px;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--transition), background-color var(--transition);
+}
+.company-link:hover {
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+}
+.company-link:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+.modal-section { margin-bottom: 28px; }
+.modal-section:last-child { margin-bottom: 0; }
+.modal-section h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.detail-item {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.detail-item .label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.detail-item .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.detail-item.wide { grid-column: 1 / -1; }
+.modal-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.modal-table-wrap table { width: 100%; font-size: 12px; }
+.modal-table-wrap th,
+.modal-table-wrap td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-table-wrap th {
+  background: var(--surface-muted);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.modal-table-wrap th.num,
+.modal-table-wrap td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+{% endblock %}
+
+{% block header %}
+<div class="brand">
+  <div class="brand-mark" aria-hidden="true">FDR</div>
+  <div>
+    <h1>Stock Listing</h1>
+    <p class="sub">실시간 종목 스크리너 · FinanceDataReader</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="panel toolbar-panel">
+  <div class="panel-body">
+    <form method="get" action="/" class="market-form">
+      <div class="field">
+        <span class="field-label">시장 선택</span>
+        <select id="market" name="market">
+          {% for group in market_groups %}
+          <optgroup label="{{ group.name }}">
+            {% for m in group.markets %}
+            <option value="{{ m.code }}" {% if m.code == current_market %}selected{% endif %}>{{ m.label }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="toolbar-actions">
+        <button type="submit" class="btn btn-primary">조회</button>
+        {% if cache_info %}
+        <button type="submit" name="refresh" value="1" class="btn btn-ghost">캐시 갱신</button>
+        {% endif %}
+      </div>
+    </form>
+    <div class="meta-row">
+      <span class="meta-chip"><strong>{{ current_market_label }}</strong></span>
+      {% if cache_info and cache_info.cached %}
+      <span class="meta-chip">캐시 {{ cache_info.fetched_at }}</span>
+      {% elif cache_info and not cache_info.cached %}
+      <span class="meta-chip">캐시 없음</span>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="dashboard-grid">
+  <div>
+    {% include 'partials/index_cards.html' %}
+  </div>
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">내 포트폴리오</h2>
+        <p class="panel-subtitle">카드를 눌러 활성 포트폴리오를 전환하고 수익률을 확인하세요</p>
+      </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button type="button" id="portfolio-card-create" class="btn btn-sm btn-primary">새로 만들기</button>
+    </div>
+    </div>
+    <div class="panel-body">
+      <div id="portfolio-cards" class="portfolio-cards"></div>
+    </div>
+  </section>
+</section>
+
+<section class="panel table-panel">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">종목 목록</h2>
+      <p class="panel-subtitle">종목명을 클릭하면 상세 정보를 볼 수 있습니다</p>
+    </div>
+    <span class="badge"><span id="visible-count">{{ count }}</span>건<span id="total-hint" class="search-hint"></span></span>
+  </div>
+  <div class="panel-body">
+    {% include 'partials/search_bar.html' %}
+    {% include 'partials/market_filter.html' %}
+  </div>
+  <div class="panel-body panel-body-flush">
+    <div class="table-wrap">
+      <table id="stock-table">
+    <thead>
+      <tr>
+        <th class="col-portfolio" aria-label="포트폴리오"></th>
+        {% for key in columns %}
+        <th class="sortable{% if key == name_column %} col-name{% elif is_numeric_column(key) %} num{% endif %}" data-column="{{ loop.index0 }}">{{ get_column_label(key) }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody id="stock-tbody" data-total="{{ count }}">
+      {% for row in stocks %}
+      <tr
+        class="stock-row"
+        data-search="{{ row[name_column] }} {{ row[symbol_column] }}"
+        {% if row_market_column %}data-market="{{ row[row_market_column] }}"{% endif %}
+      >
+        <td class="col-portfolio">
+          <button
+            type="button"
+            class="portfolio-star"
+            data-market="{{ current_market }}"
+            data-symbol="{{ row[symbol_column] }}"
+            data-name="{{ row[name_column] }}"
+            aria-label="{{ row[name_column] }} 포트폴리오에 추가"
+            aria-pressed="false"
+          >☆</button>
+        </td>
+        {% for key in columns %}
+        {% set price_class = '' %}
+        {% if key in price_columns %}
+          {% if row._change_code is defined %}
+            {% set price_class = get_change_code_class(row._change_code) %}
+          {% elif row._change_value is defined %}
+            {% set price_class = get_change_value_class(row._change_value) %}
+          {% endif %}
+        {% endif %}
+        {% set num_class = 'num' if is_numeric_column(key) else '' %}
+        {% set name_class = 'col-name' if key == name_column else '' %}
+        {% set cell_class = (price_class ~ ' ' ~ num_class ~ ' ' ~ name_class).strip() %}
+        <td
+          data-value="{{ row[key] if row[key] is not none else '' }}"
+          {% if cell_class %}class="{{ cell_class }}"{% endif %}
+        >
+          {% if key == name_column %}
+          <button
+            type="button"
+            class="company-link"
+            data-symbol="{{ row[symbol_column] }}"
+            data-name="{{ row[name_column] }}"
+          >{{ row[key] }}</button>
+          {% else %}
+          {{ format_cell_display(row[key], key, current_market) }}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      <tr id="empty-row" class="empty-row" hidden>
+        <td colspan="{{ columns|length + 1 }}">검색 결과가 없습니다.</td>
+      </tr>
+    </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<details class="api">
+  <summary>API 엔드포인트</summary>
+  <p style="margin: 10px 0 0;">
+    <code>/api/stocks?market={{ current_market }}</code> ·
+    <code>/api/markets</code> ·
+    <code>/api/company?market={{ current_market }}&amp;symbol=...</code> ·
+    <code>/api/portfolio/performance</code>
+  </p>
+</details>
+{% endblock %}
+
+{% block modals %}
+<div id="company-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <div>
+        <h2 id="modal-title">기업 정보</h2>
+        <p id="modal-subtitle"></p>
+      </div>
+      <button type="button" class="modal-close" data-modal-close aria-label="닫기">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="modal-loading">불러오는 중...</div>
+    </div>
+  </div>
+</div>
+<div id="limit-list-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="limit-list-title">
+    <div class="modal-header">
+      <div>
+        <h2 id="limit-list-title">상·하한가 종목</h2>
+        <p id="limit-list-subtitle"></p>
+      </div>
+      <button type="button" class="modal-close" data-modal-close aria-label="닫기">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="limit-list-body" class="limit-list"></div>
+    </div>
+  </div>
+</div>
+<div id="portfolio-flow-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="portfolio-flow-title">
+    <div class="modal-header">
+      <div>
+        <h2 id="portfolio-flow-title">포트폴리오 수익흐름</h2>
+        <p id="portfolio-flow-subtitle"></p>
+      </div>
+      <button type="button" class="modal-close" data-modal-close aria-label="닫기">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="flow-controls">
+        <div class="flow-controls-group">
+          <label for="flow-days">기간</label>
+          <select id="flow-days">
+            <option value="max" selected>전체</option>
+            <option value="30">1개월</option>
+            <option value="90">3개월</option>
+            <option value="180">6개월</option>
+            <option value="365">1년</option>
+          </select>
+        </div>
+        <div class="flow-controls-group">
+          <label for="flow-base-date">기준일</label>
+          <input type="date" id="flow-base-date">
+        </div>
+      </div>
+      <div id="portfolio-flow-body" class="flow-chart-wrap"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_init %}
+const companyModalCtrl = setupModal('company-modal');
+const limitListModalCtrl = setupModal('limit-list-modal');
+const portfolioFlowModalCtrl = setupModal('portfolio-flow-modal');
+modalControllers.push(companyModalCtrl, limitListModalCtrl, portfolioFlowModalCtrl);
+
+const currentMarket = {{ current_market | tojson }};
+const initialIndexCards = {{ index_cards | tojson }};
+window.latestIndexCards = initialIndexCards;
+const companyModal = companyModalCtrl;
+const modalTitle = document.getElementById('modal-title');
+const modalSubtitle = document.getElementById('modal-subtitle');
+const modalBody = document.getElementById('modal-body');
+const limitListBody = document.getElementById('limit-list-body');
+const limitListTitle = document.getElementById('limit-list-title');
+const limitListSubtitle = document.getElementById('limit-list-subtitle');
+const flowBody = document.getElementById('portfolio-flow-body');
+const flowTitle = document.getElementById('portfolio-flow-title');
+const flowSubtitle = document.getElementById('portfolio-flow-subtitle');
+const flowDaysSelect = document.getElementById('flow-days');
+const flowBaseDateInput = document.getElementById('flow-base-date');
+let latestFlowData = null;
+let latestFlowPortfolioId = null;
+let latestRenderedFlow = null;
+let flowViewStart = 0;
+let flowViewEnd = null;
+let flowDrag = null;
+
+function formatValue(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'number') {
+    return value.toLocaleString('ko-KR', { maximumFractionDigits: 4 });
+  }
+  const text = String(value);
+  const normalized = text.replace(/,/g, '');
+  if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+    return Number(normalized).toLocaleString('ko-KR', { maximumFractionDigits: 4 });
+  }
+  return text;
+}
+
+function isNumericColumn(name) {
+  const textColumns = new Set(['Name', 'Industry', 'Market', 'Dept', 'Category', 'Symbol', 'Code']);
+  return !textColumns.has(name);
+}
+
+function renderItems(items) {
+  return `
+    <div class="detail-grid">
+      ${items.map(item => `
+        <div class="detail-item${item.label === '회사개요' ? ' wide' : ''}">
+          <span class="label">${item.label}</span>
+          <span class="value">${formatValue(item.value)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderTable(section) {
+  const labels = section.column_labels || section.columns;
+  return `
+    <div class="modal-table-wrap">
+      <table>
+        <thead>
+          <tr>${section.columns.map((col, index) => `<th class="${isNumericColumn(col) ? 'num' : ''}">${labels[index] || col}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${section.rows.map(row => `
+            <tr>${section.columns.map(col => `<td class="${isNumericColumn(col) ? 'num' : ''}">${formatValue(row[col])}</td>`).join('')}</tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderDetail(data) {
+  return data.sections.map(section => `
+    <section class="modal-section">
+      <h3>${section.title}</h3>
+      ${section.type === 'table' ? renderTable(section) : renderItems(section.items)}
+    </section>
+  `).join('');
+}
+
+function openCompanyModal(symbol, name) {
+  companyModal.open();
+  modalTitle.textContent = name;
+  modalSubtitle.textContent = `${currentMarket} · ${symbol}`;
+  modalBody.innerHTML = '<div class="modal-loading">불러오는 중...</div>';
+
+  fetch(`/api/company?market=${encodeURIComponent(currentMarket)}&symbol=${encodeURIComponent(symbol)}`)
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) {
+        modalBody.innerHTML = `<div class="modal-error">${data.error || '조회에 실패했습니다.'}</div>`;
+        return;
+      }
+      modalTitle.textContent = data.name;
+      modalSubtitle.textContent = `${data.market} · ${data.symbol}`;
+      modalBody.innerHTML = renderDetail(data);
+    })
+    .catch(() => {
+      modalBody.innerHTML = '<div class="modal-error">네트워크 오류가 발생했습니다.</div>';
+    });
+}
+
+function openLimitListModal(metricKey) {
+  const cards = window.latestIndexCards || [];
+  const card = cards.find((item) => item.metric_key === metricKey);
+  if (!card) return;
+
+  const title = metricKey === 'limit_up' ? '상한가 종목' : '하한가 종목';
+  limitListTitle.textContent = title;
+  limitListSubtitle.textContent = `${currentMarket} · ${card.value || '-' }종목`;
+
+  const items = Array.isArray(card.items) ? card.items : [];
+  if (!items.length) {
+    limitListBody.innerHTML = '<p class="limit-list-empty">해당 종목이 없습니다.</p>';
+  } else {
+    limitListBody.innerHTML = items.map((item) => `
+      <div class="limit-list-item">
+        <div class="limit-item-info">
+          <span class="limit-item-name">${item.name}</span>
+          <span class="limit-item-symbol">${item.symbol}</span>
+        </div>
+        <button
+          type="button"
+          class="btn btn-sm btn-ghost"
+          data-limit-symbol="${item.symbol}"
+          data-limit-name="${item.name}"
+        >상세</button>
+      </div>
+    `).join('');
+  }
+
+  limitListModalCtrl?.open();
+}
+
+function getPalette(index) {
+  const colors = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#7c3aed', '#0f766e'];
+  return colors[index % colors.length];
+}
+
+function makePath(values, minVal, maxVal, width, height, pad = 24) {
+  if (!values.length) return '';
+  const xStep = values.length > 1 ? (width - pad * 2) / (values.length - 1) : 0;
+  const range = maxVal - minVal || 1;
+  return values.map((v, i) => {
+    const x = pad + xStep * i;
+    const y = height - pad - ((v - minVal) / range) * (height - pad * 2);
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+}
+
+function buildNormalizedFlow(data, baseDate) {
+  if (!data?.dates?.length || !data?.series?.length) return null;
+  const dates = data.dates;
+  const baseIndex = dates.indexOf(baseDate);
+  if (baseIndex < 0) return null;
+
+  const normalize = (series) => {
+    const baseValue = Number(series.values?.[baseIndex]);
+    if (!Number.isFinite(baseValue) || baseValue === 0) return null;
+    return {
+      ...series,
+      normalized: series.values.map((v) => Number(v) / baseValue),
+    };
+  };
+
+  const normalizedSeries = data.series
+    .map((series) => {
+      const out = normalize(series);
+      return out ? { ...out, kind: 'portfolio' } : null;
+    })
+    .filter(Boolean);
+
+  if (!normalizedSeries.length) return null;
+
+  const normalizedBenchmarks = (data.benchmarks || [])
+    .map((series) => {
+      const out = normalize(series);
+      return out ? { ...out, kind: 'benchmark' } : null;
+    })
+    .filter(Boolean);
+
+  const portfolio = dates.map((_, idx) => {
+    return normalizedSeries.reduce((sum, series) => {
+      const weight = Number(series.weight ?? 0);
+      return sum + weight * Number(series.normalized[idx]);
+    }, 0);
+  });
+
+  return { dates, series: normalizedSeries, benchmarks: normalizedBenchmarks, portfolio, baseDate };
+}
+
+function renderFlowChart(data) {
+  if (!data?.dates?.length || !data?.series?.length) {
+    flowBody.innerHTML = '<p class="flow-empty">비교할 데이터가 없습니다.</p>';
+    return;
+  }
+
+  const baseDate = flowBaseDateInput?.value || data.default_base_date || data.dates[data.dates.length - 1];
+  const normalized = buildNormalizedFlow(data, baseDate);
+  if (!normalized) {
+    flowBody.innerHTML = '<p class="flow-empty">기준일 계산에 필요한 데이터가 없습니다.</p>';
+    return;
+  }
+  const totalCount = normalized.dates.length;
+  if (flowViewEnd === null || flowViewEnd >= totalCount || flowViewStart < 0 || flowViewStart >= flowViewEnd) {
+    flowViewStart = 0;
+    flowViewEnd = totalCount - 1;
+  }
+
+  const viewStart = Math.max(0, Math.min(flowViewStart, totalCount - 1));
+  const viewEnd = Math.max(viewStart + 1, Math.min(flowViewEnd, totalCount - 1));
+  flowViewStart = viewStart;
+  flowViewEnd = viewEnd;
+
+  const visibleDates = normalized.dates.slice(viewStart, viewEnd + 1);
+  const visibleSeries = normalized.series.map((s) => ({
+    ...s,
+    normalized: s.normalized.slice(viewStart, viewEnd + 1),
+  }));
+  const visibleBenchmarks = normalized.benchmarks.map((s) => ({
+    ...s,
+    normalized: s.normalized.slice(viewStart, viewEnd + 1),
+  }));
+  const visiblePortfolio = normalized.portfolio.slice(viewStart, viewEnd + 1);
+
+  latestRenderedFlow = {
+    ...normalized,
+    dates: visibleDates,
+    series: visibleSeries,
+    benchmarks: visibleBenchmarks,
+    portfolio: visiblePortfolio,
+    viewStart,
+    viewEnd,
+    totalCount,
+  };
+
+  const width = 860;
+  const height = 280;
+  const allValues = visibleSeries.flatMap((s) => s.normalized)
+    .concat(visibleBenchmarks.flatMap((s) => s.normalized))
+    .concat(visiblePortfolio || []);
+  const minVal = Math.min(...allValues);
+  const maxVal = Math.max(...allValues);
+  const portfolioPath = makePath(visiblePortfolio || [], minVal, maxVal, width, height);
+
+  const lines = visibleSeries.map((series, idx) => {
+    const color = getPalette(idx + 1);
+    const path = makePath(series.normalized, minVal, maxVal, width, height);
+    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="1.6" opacity="0.9"/>`;
+  }).join('');
+
+  const benchmarkLines = visibleBenchmarks.map((series, idx) => {
+    const colors = ['#cbd5e1', '#bfdbfe', '#ddd6fe'];
+    const color = colors[idx % colors.length];
+    const path = makePath(series.normalized, minVal, maxVal, width, height);
+    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="1.2" stroke-dasharray="4 5" opacity="0.75"/>`;
+  }).join('');
+
+  const legends = visibleSeries.map((series, idx) => `
+    <span class="flow-legend-item">
+      <span class="flow-legend-dot" style="background:${getPalette(idx + 1)};"></span>
+      ${series.name}
+    </span>
+  `).join('');
+
+  const benchmarkLegends = visibleBenchmarks.map((series, idx) => {
+    const colors = ['#cbd5e1', '#bfdbfe', '#ddd6fe'];
+    const color = colors[idx % colors.length];
+    return `
+      <span class="flow-legend-item benchmark">
+        <span class="flow-legend-dot" style="background:${color};"></span>
+        ${series.name}
+      </span>
+    `;
+  }).join('');
+
+  const tickCount = Math.min(6, Math.max(2, visibleDates.length));
+  const xTickLabels = Array.from({ length: tickCount }).map((_, i) => {
+    const ratio = tickCount === 1 ? 0 : i / (tickCount - 1);
+    const idx = Math.round(ratio * (visibleDates.length - 1));
+    const x = 24 + ratio * (width - 48);
+    const date = visibleDates[idx];
+    return `<text class="flow-axis-label" x="${x - 34}" y="${height - 8}">${date}</text>`;
+  }).join('');
+
+  flowBody.innerHTML = `
+    <svg class="flow-chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="포트폴리오 수익흐름 차트">
+      <line class="flow-grid-line" x1="24" y1="${height - 24}" x2="${width - 24}" y2="${height - 24}"/>
+      <line class="flow-grid-line" x1="24" y1="${(height - 24 + 24) / 2}" x2="${width - 24}" y2="${(height - 24 + 24) / 2}"/>
+      <line class="flow-grid-line" x1="24" y1="24" x2="${width - 24}" y2="24"/>
+      <line x1="24" y1="${height - 24}" x2="${width - 24}" y2="${height - 24}" stroke="#cbd5e1" stroke-width="1"/>
+      <line x1="24" y1="24" x2="24" y2="${height - 24}" stroke="#cbd5e1" stroke-width="1"/>
+      ${lines}
+      ${benchmarkLines}
+      <path d="${portfolioPath}" fill="none" stroke="#0f172a" stroke-width="2.8"/>
+      <text class="flow-axis-label" x="30" y="20">기준일 ${baseDate} = 1.00 · 표시구간 ${visibleDates[0]} ~ ${visibleDates[visibleDates.length - 1]}</text>
+      <text class="flow-axis-label" x="6" y="28">${maxVal.toFixed(2)}</text>
+      <text class="flow-axis-label" x="6" y="${(height - 24 + 24) / 2 + 4}">${((maxVal + minVal) / 2).toFixed(2)}</text>
+      <text class="flow-axis-label" x="6" y="${height - 24}">${minVal.toFixed(2)}</text>
+      ${xTickLabels}
+    </svg>
+    <div class="flow-legend">
+      <span class="flow-legend-item"><span class="flow-legend-dot" style="background:#0f172a;"></span>포트폴리오</span>
+      ${legends}
+      ${benchmarkLegends}
+    </div>
+  `;
+}
+
+function pickFlowBaseDateByClick(event) {
+  if (!latestFlowData || !latestRenderedFlow || !flowBaseDateInput) return;
+  const svg = event.target.closest('.flow-chart-svg');
+  if (!svg) return;
+
+  const viewWidth = 860;
+  const pad = 24;
+  const count = latestRenderedFlow.dates.length;
+  if (count <= 0) return;
+
+  const rect = svg.getBoundingClientRect();
+  const xPixel = event.clientX - rect.left;
+  const x = (xPixel / rect.width) * viewWidth;
+  const xStep = count > 1 ? (viewWidth - pad * 2) / (count - 1) : 0;
+
+  let index = 0;
+  if (count > 1 && xStep > 0) {
+    index = Math.round((x - pad) / xStep);
+    index = Math.max(0, Math.min(count - 1, index));
+  }
+
+  const pickedDate = latestRenderedFlow.dates[index];
+  if (!pickedDate) return;
+  flowBaseDateInput.value = pickedDate;
+  renderFlowChart(latestFlowData);
+}
+
+function zoomFlowByWheel(event) {
+  if (!latestFlowData || !latestRenderedFlow) return;
+  const svg = event.target.closest('.flow-chart-svg');
+  if (!svg) return;
+  event.preventDefault();
+
+  const total = latestRenderedFlow.totalCount;
+  const start = latestRenderedFlow.viewStart;
+  const end = latestRenderedFlow.viewEnd;
+  const currentCount = end - start + 1;
+  const minCount = 20;
+
+  const factor = event.deltaY < 0 ? 0.85 : 1.18;
+  let nextCount = Math.round(currentCount * factor);
+  nextCount = Math.max(minCount, Math.min(total, nextCount));
+  if (nextCount === currentCount) return;
+
+  const rect = svg.getBoundingClientRect();
+  const xPixel = event.clientX - rect.left;
+  const ratio = Math.max(0, Math.min(1, xPixel / rect.width));
+  const anchor = start + Math.round(ratio * (currentCount - 1));
+  let nextStart = anchor - Math.round(ratio * (nextCount - 1));
+  let nextEnd = nextStart + nextCount - 1;
+
+  if (nextStart < 0) {
+    nextStart = 0;
+    nextEnd = nextCount - 1;
+  }
+  if (nextEnd >= total) {
+    nextEnd = total - 1;
+    nextStart = total - nextCount;
+  }
+
+  flowViewStart = nextStart;
+  flowViewEnd = nextEnd;
+  renderFlowChart(latestFlowData);
+}
+
+function startFlowDrag(event) {
+  const svg = event.target.closest('.flow-chart-svg');
+  if (!svg || !latestRenderedFlow) return;
+  flowDrag = {
+    startX: event.clientX,
+    viewStart: latestRenderedFlow.viewStart,
+    viewEnd: latestRenderedFlow.viewEnd,
+  };
+  svg.classList.add('is-dragging');
+}
+
+function moveFlowDrag(event) {
+  if (!flowDrag || !latestFlowData || !latestRenderedFlow) return;
+  const total = latestRenderedFlow.totalCount;
+  const viewCount = flowDrag.viewEnd - flowDrag.viewStart + 1;
+  const svg = flowBody.querySelector('.flow-chart-svg');
+  if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const dx = event.clientX - flowDrag.startX;
+  const shift = Math.round((dx / rect.width) * viewCount);
+
+  let nextStart = flowDrag.viewStart - shift;
+  let nextEnd = flowDrag.viewEnd - shift;
+  if (nextStart < 0) {
+    nextStart = 0;
+    nextEnd = viewCount - 1;
+  }
+  if (nextEnd >= total) {
+    nextEnd = total - 1;
+    nextStart = total - viewCount;
+  }
+  flowViewStart = nextStart;
+  flowViewEnd = nextEnd;
+  renderFlowChart(latestFlowData);
+}
+
+function endFlowDrag() {
+  const svg = flowBody.querySelector('.flow-chart-svg');
+  svg?.classList.remove('is-dragging');
+  flowDrag = null;
+}
+
+async function openPortfolioFlowModal(portfolioId) {
+  const state = window.loadPortfolioState ? window.loadPortfolioState() : null;
+  const portfolio = state?.portfolios?.find((p) => p.id === portfolioId) || null;
+  if (!portfolio) return;
+
+  flowTitle.textContent = `${portfolio.name} 수익흐름`;
+  flowSubtitle.textContent = `기준값 1.00 · ${currentMarket}와 무관하게 포트폴리오 구성 종목 비교`;
+  flowBody.innerHTML = '<p class="flow-empty">불러오는 중...</p>';
+  portfolioFlowModalCtrl?.open();
+
+  const selectedDays = flowDaysSelect?.value || 'max';
+  try {
+    const response = await fetch('/api/portfolio/flow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        days: selectedDays,
+        holdings: (portfolio.items || []).map((item) => ({
+          market: item.market,
+          symbol: item.symbol,
+          name: item.name,
+          weight: item.weight,
+        })),
+      }),
+    });
+    const data = await response.json();
+    latestFlowData = data;
+    latestFlowPortfolioId = portfolioId;
+    flowViewStart = 0;
+    flowViewEnd = null;
+    if (flowBaseDateInput && data?.dates?.length) {
+      flowBaseDateInput.min = data.dates[0];
+      flowBaseDateInput.max = data.dates[data.dates.length - 1];
+      flowBaseDateInput.value = data.default_base_date || data.dates[data.dates.length - 1];
+    }
+    renderFlowChart(data);
+    if (data?.start_date && data?.end_date) {
+      flowSubtitle.textContent = `${portfolio.name} · ${data.start_date} ~ ${data.end_date} (기준일=1.00, 과거 포함)`;
+    }
+  } catch {
+    flowBody.innerHTML = '<p class="flow-empty">수익흐름 데이터를 불러오지 못했습니다.</p>';
+  }
+}
+
+window.openPortfolioFlowModal = openPortfolioFlowModal;
+
+const stockTbody = document.getElementById('stock-tbody');
+if (stockTbody) {
+  stockTbody.addEventListener('click', (event) => {
+    const button = event.target.closest('.company-link');
+    if (!button) return;
+    openCompanyModal(button.dataset.symbol, button.dataset.name);
+  });
+}
+
+const indexCardsEl = document.getElementById('index-cards');
+indexCardsEl?.addEventListener('click', (event) => {
+  const card = event.target.closest('.index-card-action');
+  if (!card) return;
+  const metricKey = card.dataset.metricKey;
+  if (!metricKey) return;
+  openLimitListModal(metricKey);
+});
+
+limitListBody?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-limit-symbol]');
+  if (!button) return;
+  limitListModalCtrl?.close();
+  openCompanyModal(button.dataset.limitSymbol, button.dataset.limitName);
+});
+
+flowDaysSelect?.addEventListener('change', () => {
+  const activeCard = document.querySelector('.portfolio-card.active');
+  const portfolioId = activeCard?.getAttribute('data-portfolio-card');
+  if (!portfolioId) return;
+  openPortfolioFlowModal(portfolioId);
+});
+
+flowBaseDateInput?.addEventListener('change', () => {
+  if (!latestFlowData || !latestFlowPortfolioId) return;
+  renderFlowChart(latestFlowData);
+});
+
+flowBody?.addEventListener('click', (event) => {
+  pickFlowBaseDateByClick(event);
+});
+flowBody?.addEventListener('wheel', (event) => {
+  zoomFlowByWheel(event);
+}, { passive: false });
+flowBody?.addEventListener('mousedown', (event) => {
+  startFlowDrag(event);
+});
+window.addEventListener('mousemove', (event) => {
+  moveFlowDrag(event);
+});
+window.addEventListener('mouseup', () => {
+  endFlowDrag();
+});
+
+setupTableFilters({});
+setupTableSort({ tableId: 'stock-table', tbodyId: 'stock-tbody' });
+setupIndexCards({ market: currentMarket });
+
+const openSymbol = new URLSearchParams(window.location.search).get('symbol');
+if (openSymbol) {
+  const link = stockTbody?.querySelector(`.company-link[data-symbol="${CSS.escape(openSymbol)}"]`);
+  openCompanyModal(openSymbol, link?.dataset.name || openSymbol);
+}
+{% endblock %}

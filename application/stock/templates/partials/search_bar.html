@@ -1,0 +1,13 @@
+<div class="search-bar">
+  <div class="search-field">
+    <label class="sr-only" for="stock-search">종목 검색</label>
+    <input
+      type="search"
+      id="stock-search"
+      placeholder="{{ search_placeholder | default('종목명·심볼 검색') }}"
+      autocomplete="off"
+      spellcheck="false"
+    >
+  </div>
+  <span id="search-status" class="search-hint"></span>
+</div>

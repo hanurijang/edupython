@@ -1,0 +1,18 @@
+{% if market_options %}
+<div class="market-filter" id="market-filter">
+  <div class="market-filter-header">
+    <span class="market-filter-label">시장 구분</span>
+    <button type="button" class="btn btn-ghost btn-sm" data-market-action="all">전체 선택</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-market-action="none">전체 해제</button>
+  </div>
+  <div class="market-filter-options">
+    {% for option in market_options %}
+    <label class="market-filter-item">
+      <input type="checkbox" value="{{ option.value }}" checked>
+      <span>{{ option.value }}</span>
+      <span class="market-filter-count">{{ format_number(option.count) }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

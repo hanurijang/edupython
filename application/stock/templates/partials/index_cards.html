@@ -1,0 +1,41 @@
+{% if index_cards %}
+<section class="index-cards" id="index-cards" data-market="{{ current_market }}">
+  {% for card in index_cards %}
+  {% if card.card_type == 'market_stat' %}
+  <article
+    class="index-card stat-card stat-{{ card.direction }}{% if card.metric_key in ['limit_up', 'limit_down'] %} index-card-action{% endif %}{% if card.metric_key == 'sector_avg_returns' %} stat-card-sector{% endif %}"
+    {% if card.metric_key in ['limit_up', 'limit_down'] %}data-metric-key="{{ card.metric_key }}"{% endif %}
+  >
+    <div class="index-card-top">
+      <h3 class="index-name">{{ card.name }}</h3>
+    </div>
+    <p class="index-close">{{ card.value }}</p>
+    {% if card.metric_key in ['top_avg_returns', 'sector_avg_returns'] and card.breakdown %}
+    <div class="top-avg-breakdown{% if card.metric_key == 'sector_avg_returns' %} sector-avg-breakdown{% endif %}">
+      {% for row in card.breakdown %}
+      <div class="top-avg-row">
+        <span class="top-avg-label">{{ row.label }}{% if row.count %} <span class="top-avg-count">({{ row.count }})</span>{% endif %}</span>
+        <span class="top-avg-value value-{{ row.direction | default('flat') }}">{{ row.value }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <p class="index-date">{{ card.subvalue }}</p>
+  </article>
+  {% else %}
+  <article class="index-card index-{{ card.direction }}">
+    <div class="index-card-top">
+      <h3 class="index-name">{{ card.name }}</h3>
+      <span class="index-session session-{{ card.session.code }}">{{ card.session.label }}</span>
+    </div>
+    <p class="index-close">{{ format_number(card.close, decimals=2) }}</p>
+    <p class="index-change">
+      {% if card.change > 0 %}+{% endif %}{{ format_number(card.change, decimals=2) }}
+      ({% if card.change_pct > 0 %}+{% endif %}{{ format_number(card.change_pct, decimals=2) }}%)
+    </p>
+    <p class="index-date">{{ card.date }} 기준</p>
+  </article>
+  {% endif %}
+  {% endfor %}
+</section>
+{% endif %}
