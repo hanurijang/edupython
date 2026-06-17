@@ -1,0 +1,14 @@
+pandas
+folium
+matplotlib
+numpy
+requests
+seaborn
+scikit-learn
+scipy
+statsmodels
+plotly
+ipykernel
+ipython
+finance-datareader
+pykrx
