@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
 from app.services.company_detail import get_company_detail, get_symbol_column, NAME_COLUMN
 from app.services.index_constituents import (
@@ -46,13 +46,17 @@ def index():
     if market not in SUPPORTED_MARKETS:
         market = DEFAULT_MARKET
 
-    df = get_stock_listing(market, force_refresh=_force_refresh())
+    refresh = _force_refresh()
+    df = get_stock_listing(market, force_refresh=refresh)
     table_df = get_table_listing(market, df)
     symbol_column = get_symbol_column(market)
     stocks = enrich_table_rows(market, df, table_df, symbol_column)
     row_market_column, market_options = get_row_market_filter(df)
 
     columns = table_df.columns.tolist()
+
+    if refresh:
+        return redirect(url_for('main.index', market=market))
 
     return render_template(
         'index.html',

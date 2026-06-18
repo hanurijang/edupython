@@ -10,5 +10,8 @@ statsmodels
 plotly
 ipykernel
 ipython
-finance-datareader
-pykrx
+flask>=3.0
+finance-datareader>=0.9
+pykrx>=1.2.8
+python-dotenv
+yfinance>=0.2

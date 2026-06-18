@@ -1,0 +1,29 @@
+<div class="modal-overlay" id="add-card-modal" hidden>
+  <div
+    class="modal-dialog add-card-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="add-card-modal-title"
+  >
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" id="add-card-modal-title">카드 추가</h3>
+        <p class="add-card-modal-desc" id="add-card-modal-desc">종목명 또는 코드로 검색하세요.</p>
+      </div>
+      <button type="button" class="modal-close" id="add-card-modal-close" aria-label="닫기">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form class="add-card-form" id="add-card-form">
+        <input
+          type="search"
+          id="add-card-search"
+          class="add-card-search"
+          placeholder="검색어 입력…"
+          autocomplete="off"
+        >
+      </form>
+      <p class="add-card-status" id="add-card-status">2글자 이상 입력하면 검색됩니다.</p>
+      <ul class="add-card-results" id="add-card-results"></ul>
+    </div>
+  </div>
+</div>

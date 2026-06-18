@@ -1,0 +1,31 @@
+<nav class="category-nav" aria-label="카테고리">
+  <div class="category-tabs category-tabs-indicators">
+    {% for cat in categories if cat.get('kind', 'indicator') == 'indicator' %}
+    <a
+      href="{{ url_for('main.dashboard', category=cat.id) }}"
+      class="category-tab{% if cat.id == current_category %} active{% endif %}"
+      data-category="{{ cat.id }}"
+    >{{ cat.label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="category-tabs-tools" aria-label="분석 도구">
+    <span class="category-tabs-tools-label">도구</span>
+    {% for cat in categories if cat.get('kind') == 'tool' %}
+    <a
+      href="{{ url_for('main.dashboard', category=cat.id) }}"
+      class="category-tab category-tab-tool category-tab-{{ cat.tool }}{% if cat.id == current_category %} active{% endif %}"
+      data-category="{{ cat.id }}"
+    >
+      {% if cat.tool == 'favorites' %}
+      <span class="category-tab-icon category-tab-icon-star" aria-hidden="true">★</span>
+      <span class="category-tab-text">{{ cat.label }}</span>
+      <span class="category-tab-count">({{ cat.count | default(favorite_ids | length) }})</span>
+      {% elif cat.tool == 'simulation' %}
+      <span class="category-tab-icon category-tab-icon-simulation" aria-hidden="true"></span>
+      <span class="category-tab-text">{{ cat.label }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</nav>

@@ -1,0 +1,78 @@
+<section class="indicator-cards" id="indicator-cards" data-category="{{ current_category }}">
+  {% if cards %}
+    {% set ns = namespace(last_group=none) %}
+    {% for card in cards %}
+      {% if current_category == 'fx' and card.fx_group and card.fx_group != ns.last_group %}
+        {% if card.fx_group == 'krw' %}
+        <h2 class="fx-section-title">원화(KRW) 환율</h2>
+        {% elif card.fx_group == 'reference' %}
+        <h2 class="fx-section-title">참고 지표</h2>
+        {% endif %}
+        {% set ns.last_group = card.fx_group %}
+      {% endif %}
+      <article
+        class="indicator-card indicator-{{ card.direction }}{% if card.is_custom %} is-custom{% endif %}{% if card.error %} has-error{% endif %}"
+        data-id="{{ card.id }}"
+        data-name="{{ card.name }}"
+      >
+        <div class="indicator-card-top">
+          <h3 class="indicator-name">{{ card.name }}</h3>
+          <div class="indicator-card-actions">
+            {% if card.is_custom %}
+            <button
+              type="button"
+              class="custom-remove-btn"
+              data-id="{{ card.id }}"
+              aria-label="카드 제거"
+              title="추가 카드 제거"
+            >×</button>
+            {% endif %}
+            <button
+              type="button"
+              class="favorite-btn{% if card.id in favorite_ids %} is-active{% endif %}"
+              data-id="{{ card.id }}"
+              aria-label="즐겨찾기"
+              aria-pressed="{{ 'true' if card.id in favorite_ids else 'false' }}"
+              title="즐겨찾기"
+            >
+              <span class="favorite-icon" aria-hidden="true">{% if card.id in favorite_ids %}★{% else %}☆{% endif %}</span>
+            </button>
+          </div>
+        </div>
+        {% if card.error %}
+        <p class="indicator-close error-badge">{{ card.error }}</p>
+        {% else %}
+        <p class="indicator-close">{{ format_number(card.close, decimals=card.decimals | default(2)) }}</p>
+        <p class="indicator-meta">
+          <span class="indicator-change {{ card.direction }}">
+            {% if card.change is not none %}
+              {% if card.change_pct > 0 %}+{% endif %}{{ format_number(card.change_pct, decimals=2) }}%
+            {% else %}-{% endif %}
+          </span>
+          <span class="indicator-date">{% if card.date %}{{ card.date }}{% else %}-{% endif %}</span>
+        </p>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    {% if current_category == 'favorites' %}
+    즐겨찾기한 지표가 없습니다. 카드의 별(☆)을 눌러 추가하세요.
+    {% else %}
+    표시할 지표가 없습니다.
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if current_category in customizable_categories %}
+  <button
+    type="button"
+    class="indicator-card-add"
+    id="add-custom-card-btn"
+    aria-label="카드 추가하기"
+  >
+    <span class="indicator-card-add-icon" aria-hidden="true">+</span>
+    <span class="indicator-card-add-label">카드 추가</span>
+    <span class="indicator-card-add-hint">로컬 저장</span>
+  </button>
+  {% endif %}
+</section>

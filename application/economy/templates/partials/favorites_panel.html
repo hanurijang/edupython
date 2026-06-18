@@ -1,0 +1,28 @@
+<section class="favorites-panel" id="favorites-panel">
+  <div class="favorites-panel-header">
+    <div>
+      <h2 class="favorites-title">즐겨찾기 분석</h2>
+      <p class="favorites-subtitle" id="favorites-summary">저장된 지표를 100 기준으로 비교하고 상관계수를 확인합니다.</p>
+    </div>
+    <div class="favorites-period-tabs" id="favorites-period-tabs">
+      <button type="button" class="period-tab" data-period="3m">3M</button>
+      <button type="button" class="period-tab" data-period="6m">6M</button>
+      <button type="button" class="period-tab active" data-period="1y">1Y</button>
+      <button type="button" class="period-tab" data-period="3y">3Y</button>
+    </div>
+  </div>
+
+  <div class="favorites-chips" id="favorites-chips"></div>
+
+  <div class="favorites-charts">
+    <div class="favorites-chart-block">
+      <h3 class="favorites-chart-title">100 기준 비교</h3>
+      <div id="favorites-compare-chart" class="favorites-chart"></div>
+    </div>
+    <div class="favorites-chart-block">
+      <h3 class="favorites-chart-title">상관계수</h3>
+      <div id="favorites-corr-chart" class="favorites-chart"></div>
+      <ul class="correlation-pairs" id="correlation-pairs"></ul>
+    </div>
+  </div>
+</section>

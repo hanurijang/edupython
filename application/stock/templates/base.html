@@ -1074,7 +1074,7 @@
     }
 
     function setupIndexCards(options = {}) {
-      const { market, refreshMs = 60000 } = options;
+      const { market, refreshMs = 15000 } = options;
       const container = document.getElementById('index-cards');
       if (!container || !market) return;
 
@@ -1087,6 +1087,7 @@
           .catch(() => {});
       };
 
+      load();
       if (refreshMs > 0) {
         setInterval(load, refreshMs);
       }

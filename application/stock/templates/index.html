@@ -651,18 +651,20 @@
       </div>
       <div class="toolbar-actions">
         <button type="submit" class="btn btn-primary">조회</button>
-        {% if cache_info %}
-        <button type="submit" name="refresh" value="1" class="btn btn-ghost">캐시 갱신</button>
+        {% if current_market == 'KRX' %}
+        <button type="submit" name="refresh" value="1" class="btn btn-ghost">실시간 갱신</button>
         {% endif %}
       </div>
     </form>
     <div class="meta-row">
       <span class="meta-chip"><strong>{{ current_market_label }}</strong></span>
-      {% if cache_info and cache_info.cached %}
-      <span class="meta-chip">캐시 {{ cache_info.fetched_at }}</span>
-      {% elif cache_info and not cache_info.cached %}
-      <span class="meta-chip">캐시 없음</span>
+      {% if cache_info and cache_info.cached and cache_info.data_source == 'naver' %}
+      <span class="meta-chip">실시간 갱신 {{ cache_info.fetched_at }}</span>
       {% endif %}
+      {% if cache_info and cache_info.sector and cache_info.sector.cached %}
+      <span class="meta-chip">섹터 캐시 {{ cache_info.sector.fetched_at }} (30일)</span>
+      {% endif %}
+      <span class="meta-chip">조회·F5는 FDR 스냅샷(빠름) · 장중 시세는 <strong>실시간 갱신</strong></span>
     </div>
   </div>
 </section>

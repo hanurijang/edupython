@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import FinanceDataReader as fdr
 import pandas as pd
+import requests
 from app.services.stock_listing import get_stock_listing
 from app.services.company_detail import get_symbol_column
-
-INDEX_CACHE_TTL = timedelta(seconds=60)
-_index_cache: dict[str, tuple[datetime, list[dict]]] = {}
 
 SESSION_LABELS = {
     'open': '장중',
@@ -29,6 +28,11 @@ KR_INDICES = [
     {'symbol': 'KS11', 'name': '코스피'},
     {'symbol': 'KQ11', 'name': '코스닥'},
 ]
+
+KR_INDEX_NAVER_CODE = {
+    'KS11': 'KOSPI',
+    'KQ11': 'KOSDAQ',
+}
 
 MARKET_INDEX_CONFIG: dict[str, list[dict]] = {
     'KRX': [{**item, 'session': 'kr'} for item in KR_INDICES],
@@ -128,7 +132,69 @@ def _parse_index_date(value) -> str:
     return str(value)[:10]
 
 
+def _parse_naver_index_number(value) -> float:
+    if value is None:
+        return 0.0
+    cleaned = re.sub(r'[^\d.\-]', '', str(value).replace(',', ''))
+    if not cleaned or cleaned == '-':
+        return 0.0
+    return float(cleaned)
+
+
+def _fetch_naver_kr_index(symbol: str, name: str, session_status: dict) -> dict | None:
+    """네이버 폴링 API로 코스피·코스닥 장중 지수를 조회합니다."""
+    code = KR_INDEX_NAVER_CODE.get(symbol)
+    if not code:
+        return None
+
+    url = f'https://polling.finance.naver.com/api/realtime/domestic/index/{code}'
+    try:
+        response = requests.get(
+            url,
+            headers={'User-Agent': 'Mozilla/5.0'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        rows = payload.get('datas') or []
+        if not rows:
+            return None
+        row = rows[0]
+    except Exception:
+        return None
+
+    close = _parse_naver_index_number(row.get('closePrice'))
+    change_abs = abs(_parse_naver_index_number(row.get('compareToPreviousClosePrice')))
+    change_pct = _parse_naver_index_number(row.get('fluctuationsRatio'))
+
+    # 등락률 부호로 전일비 방향 결정
+    change = change_abs if change_pct >= 0 else -change_abs
+
+    traded_at = row.get('localTradedAt') or row.get('tradedAt')
+    if traded_at:
+        date = str(traded_at)[:10]
+    else:
+        date = datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y-%m-%d')
+
+    return {
+        'name': name,
+        'symbol': symbol,
+        'close': _round_num(close, 2),
+        'change': _round_num(change, 2),
+        'change_pct': _round_num(change_pct, 2),
+        'direction': _direction(change),
+        'date': date,
+        'session': session_status,
+    }
+
+
 def _fetch_krx_style_index(symbol: str, name: str, session: str) -> dict | None:
+    session_status = get_session_status(session)
+    if session_status['code'] == 'open':
+        live = _fetch_naver_kr_index(symbol, name, session_status)
+        if live is not None:
+            return live
+
     end = datetime.now().strftime('%Y-%m-%d')
     start = (datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')
     df = fdr.DataReader(symbol, start, end)
@@ -169,7 +235,7 @@ def _fetch_krx_style_index(symbol: str, name: str, session: str) -> dict | None:
         'change_pct': _round_num(change_pct, 2),
         'direction': direction,
         'date': _parse_index_date(df.index[-1]),
-        'session': get_session_status(session),
+        'session': session_status,
     }
 
 
@@ -411,20 +477,15 @@ def _compute_sector_avg_stats(df: pd.DataFrame) -> dict | None:
 
 
 def get_market_indices(market: str, *, force_refresh: bool = False) -> list[dict]:
-    """시장별 대표 지수 카드 데이터를 반환합니다."""
+    """시장별 대표 지수 카드 데이터를 반환합니다 (지수·통계는 매 요청마다 조회)."""
+    del force_refresh  # 지수 카드는 캐시하지 않음
     configs = MARKET_INDEX_CONFIG.get(market, [])
     if not configs:
         return []
-
-    if not force_refresh and market in _index_cache:
-        fetched_at, cached = _index_cache[market]
-        if datetime.now() - fetched_at < INDEX_CACHE_TTL:
-            return cached
 
     cards = [card for cfg in configs if (card := _fetch_index_card(cfg))]
     for card in cards:
         card['card_type'] = 'index'
 
     cards.extend(_compute_market_stats(market))
-    _index_cache[market] = (datetime.now(), cards)
     return cards

@@ -1,12 +1,13 @@
+import re
+from io import StringIO
+from itertools import product
+
 import FinanceDataReader as fdr
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 
-from app.services.listing_cache import (
-    get_cache_info,
-    is_cached_market,
-    load_listing,
-    save_listing,
-)
+from app.services.listing_cache import get_listing_meta, load_naver_listing, save_naver_listing
 
 MARKET_GROUPS = {
     'KRX': ['KRX'],
@@ -122,16 +123,36 @@ def _is_missing(value) -> bool:
     return bool(pd.isna(value))
 
 
-def format_number(value, *, decimals: int | None = None) -> str | None:
-    """숫자를 세 자리마다 쉼표가 들어간 문자열로 반환합니다."""
+def _coerce_float(value) -> float | None:
+    """쉼표·공백이 포함된 숫자 문자열도 변환합니다."""
     if _is_missing(value):
         return None
     if isinstance(value, bool):
-        return str(value)
-    if not isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.replace(',', '').strip()
+        if not cleaned:
+            return None
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def format_number(value, *, decimals: int | None = None) -> str | None:
+    """숫자를 세 자리마다 쉼표가 들어간 문자열로 반환합니다."""
+    num = _coerce_float(value)
+    if num is None:
+        if _is_missing(value):
+            return None
         return str(value)
 
-    num = float(value)
     if decimals is None:
         if num == int(num):
             return f'{int(num):,}'
@@ -145,10 +166,10 @@ def format_number(value, *, decimals: int | None = None) -> str | None:
 
 def to_eok_won(value, column: str, market: str) -> float | None:
     """원/백만원 등 원본 값을 억원 단위 숫자로 변환합니다."""
-    if _is_missing(value):
+    amount = _coerce_float(value)
+    if amount is None:
         return None
 
-    amount = float(value)
     if market == 'ETF/KR':
         if column == 'Amount':
             return amount / 100
@@ -330,6 +351,144 @@ def add_market_share_columns(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def _parse_naver_number(value) -> float | None:
+    """네이버 시세 표기(상승/하락, ▲▼, 쉼표)를 숫자로 변환합니다."""
+    if _is_missing(value):
+        return None
+    text = str(value).strip()
+    if not text or text in ('-', 'N/A'):
+        return None
+    if '하락' in text:
+        sign = -1
+    elif '상승' in text:
+        sign = 1
+    elif text.startswith('▼') or text.startswith('-'):
+        sign = -1
+    else:
+        sign = 1
+    cleaned = re.sub(r'[^\d.]', '', text.replace('▲', '').replace('▼', ''))
+    if not cleaned:
+        return None
+    return sign * float(cleaned)
+
+
+def _krx_change_code_from_ratio(ratio) -> str:
+    """등락률(%) 기준 KRX ChangeCode: 1=상승, 2=하락, 3=보합, 4=상한, 5=하한."""
+    if _is_missing(ratio):
+        return '3'
+    try:
+        value = float(ratio)
+    except (TypeError, ValueError):
+        return '3'
+    if value == 0:
+        return '3'
+    if value >= 29.5:
+        return '4'
+    if value <= -29.5:
+        return '5'
+    return '1' if value > 0 else '2'
+
+
+def _normalize_krx_change_codes(df: pd.DataFrame) -> pd.DataFrame:
+    """Changes·ChangeCode를 등락률 부호에 맞게 정리합니다 (FDR/네이버 공통)."""
+    if 'ChagesRatio' not in df.columns:
+        return df
+
+    result = df.copy()
+    ratio = pd.to_numeric(result['ChagesRatio'], errors='coerce')
+    result['ChangeCode'] = ratio.map(_krx_change_code_from_ratio)
+
+    if 'Changes' in result.columns:
+        abs_changes = pd.to_numeric(result['Changes'], errors='coerce').abs()
+        sign = ratio.apply(lambda x: 0 if pd.isna(x) or x == 0 else (1 if x > 0 else -1))
+        result['Changes'] = abs_changes * sign
+
+    return result
+
+
+def _finalize_krx_listing(df: pd.DataFrame) -> pd.DataFrame:
+    return _apply_krx_sector(_normalize_krx_change_codes(df))
+
+
+def _normalize_naver_krx_listing(raw: pd.DataFrame) -> pd.DataFrame:
+    """네이버 marcap 스크랩 결과를 StockListing(KRX) 스키마에 맞춥니다."""
+    market_map = {0: 'KOSPI', 1: 'KOSDAQ', '0': 'KOSPI', '1': 'KOSDAQ'}
+    df = pd.DataFrame()
+    df['Code'] = raw['종목코드'].astype(str).str.zfill(6)
+    df['Name'] = raw['종목명'].astype(str)
+    df['Market'] = raw['시장'].map(market_map).fillna('KOSPI')
+    df['Close'] = pd.to_numeric(raw['현재가'], errors='coerce')
+    df['Changes'] = raw['전일비'].map(_parse_naver_number)
+    df['ChagesRatio'] = pd.to_numeric(raw['등락률'], errors='coerce') * 100
+    df['Open'] = pd.to_numeric(raw['시가'], errors='coerce')
+    df['High'] = pd.to_numeric(raw['고가'], errors='coerce')
+    df['Low'] = pd.to_numeric(raw['저가'], errors='coerce')
+    df['Volume'] = pd.to_numeric(raw['거래량'], errors='coerce')
+    # 네이버 거래대금·시가총액: 백만원 / 억원 → 원 단위
+    df['Amount'] = pd.to_numeric(raw['거래대금'], errors='coerce') * 1_000_000
+    df['Marcap'] = pd.to_numeric(raw['시가총액'], errors='coerce') * 100_000_000
+    df['Stocks'] = pd.to_numeric(raw['상장주식수'], errors='coerce') * 1_000
+
+    df = df.dropna(subset=['Code', 'Close']).reset_index(drop=True)
+    df.attrs = {'exchange': 'KRX', 'source': 'NAVER', 'data': 'LISTINGS'}
+    return df
+
+
+def _naver_marcap_page(sosok: int, page: int) -> pd.DataFrame:
+    """네이버 시가총액 페이지에서 종목 시세를 읽습니다 (FDR snap 대체, FutureWarning 없음)."""
+    url = f'https://finance.naver.com/sise/sise_market_sum.nhn?sosok={sosok}&page={page}'
+    field_list = [
+        ('12|06108810', ['N', '종목명', '현재가', '전일비', '등락률', '거래량', '거래대금', '시가총액']),
+        ('12|01882048', ['시가']),
+        ('12|00441424', ['고가']),
+        ('12|00234202', ['저가', '상장주식수']),
+    ]
+
+    marcap = pd.DataFrame()
+    html = ''
+    for field_key, cols in field_list:
+        html = requests.get(url, cookies={'field_list': field_key}, timeout=15).text
+        table_df = pd.read_html(StringIO(html))[1]
+        if table_df.empty:
+            return marcap
+        marcap[cols] = table_df[cols]
+
+    soup = BeautifulSoup(html, 'lxml')
+    table = soup.find_all('table')[1]
+    codes = []
+    for tr in table.find_all('tr')[1:]:
+        tds = tr.find_all('td')
+        if len(tds) >= 2 and tds[1].a:
+            codes.append(tds[1].a['href'].split('=')[1])
+        else:
+            codes.append(None)
+
+    marcap.insert(0, '종목코드', codes)
+    marcap['시장'] = sosok
+    marcap['등락률'] = (
+        marcap['등락률'].astype(str).str.replace('%', '', regex=False).str.replace(',', '', regex=False)
+        .replace('', pd.NA).astype(float) / 100.0
+    )
+    marcap.dropna(how='all', inplace=True)
+    return marcap.reset_index(drop=True)
+
+
+def _fetch_krx_listing_live() -> pd.DataFrame:
+    """네이버 금융에서 KRX 전 종목 시세를 조회합니다 (장중 실시간 반영)."""
+    pages = list(product([0], range(1, 32 + 1))) + list(product([1], range(1, 29 + 1)))
+    frames: list[pd.DataFrame] = []
+    for sosok, page in pages:
+        page_df = _naver_marcap_page(sosok, page)
+        if page_df.empty:
+            continue
+        frames.append(page_df)
+
+    if not frames:
+        raise ValueError('네이버 시세 조회 결과가 없습니다.')
+
+    return _normalize_naver_krx_listing(pd.concat(frames, ignore_index=True))
+
+
 def _apply_krx_sector(df: pd.DataFrame) -> pd.DataFrame:
     """KRX 종목 목록에 섹터 열을 붙입니다 (섹터 캐시 기준, 즉시)."""
     try:
@@ -350,37 +509,40 @@ def _apply_krx_sector(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_stock_listing(market: str, *, force_refresh: bool = False) -> pd.DataFrame:
-    """FinanceDataReader StockListing으로 종목 목록을 조회합니다."""
+    """종목 목록을 조회합니다.
+
+    - KRX 일반 조회: FDR 스냅샷(빠름, 캐시 없음). 실시간 갱신 후 저장된 네이버 목록이 있으면 우선 사용.
+    - KRX 실시간 갱신: 네이버 전 종목 조회(~1분) 후 저장.
+    - 해외 시장: FDR 직접 조회(캐시 없음).
+    """
     if market not in SUPPORTED_MARKETS:
         raise ValueError(
             f"지원하지 않는 market입니다: {market}. "
             f"사용 가능: {', '.join(SUPPORTED_MARKETS)}"
         )
 
-    if is_cached_market(market) and not force_refresh:
-        cached_df, _ = load_listing(market)
-        if cached_df is not None:
-            if market == 'KRX':
-                return _apply_krx_sector(cached_df)
-            return cached_df
-
-    df = add_market_share_columns(fdr.StockListing(market))
-
     if market == 'KRX':
-        df = _apply_krx_sector(df)
+        if force_refresh:
+            df = add_market_share_columns(_fetch_krx_listing_live())
+            df = _finalize_krx_listing(df)
+            save_naver_listing(market, df)
+            return df
 
-    if is_cached_market(market):
-        save_listing(market, df)
+        cached = load_naver_listing(market)
+        if cached is not None:
+            return _finalize_krx_listing(cached)
 
-    return df
+        df = add_market_share_columns(fdr.StockListing(market))
+        return _finalize_krx_listing(df)
+
+    return add_market_share_columns(fdr.StockListing(market))
 
 
 def get_stock_listing_meta(market: str) -> dict | None:
-    """캐시 사용 시장의 캐시 메타정보를 반환합니다."""
-    if is_cached_market(market):
-        info = get_cache_info(market)
-        if market == 'KRX' and info:
-            from app.services.sector_cache import get_cache_info as get_sector_cache_info
-            info = {**info, 'sector': get_sector_cache_info()}
-        return info
-    return None
+    """목록 메타정보 (KRX 네이버 실시간 저장분·섹터 캐시)."""
+    if market != 'KRX':
+        return None
+    from app.services.sector_cache import get_cache_info as get_sector_cache_info
+
+    info = get_listing_meta(market) or {'cached': False, 'data_source': 'fdr', 'storage': None}
+    return {**info, 'sector': get_sector_cache_info()}

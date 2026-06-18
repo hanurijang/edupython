@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 SECTOR_CACHE_DIR = Path(__file__).resolve().parent.parent.parent / 'cache' / 'sector'
-SECTOR_TTL = timedelta(days=7)
+SECTOR_TTL = timedelta(days=30)
 
 _memory: dict | None = None
 

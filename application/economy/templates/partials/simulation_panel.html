@@ -1,0 +1,120 @@
+<section class="simulation-panel" id="simulation-panel">
+  <div class="simulation-header">
+    <div>
+      <h2 class="simulation-title">시뮬레이션</h2>
+      <p class="simulation-subtitle">특정 시점에 매수했다면, 오늘까지 수익률이 어땠을까요?</p>
+      <button type="button" class="btn simulation-coverage-open" id="simulation-coverage-btn">
+        포함 범위 보기 · <span id="simulation-coverage-count">{{ simulation_coverage.total_count }}개</span>
+      </button>
+    </div>
+    <form class="simulation-form" id="simulation-form">
+      <div class="simulation-scope-tabs" id="simulation-scope-tabs" role="tablist" aria-label="비교 범위">
+        <button
+          type="button"
+          class="simulation-scope-tab{% if simulation_scope == 'cards' %} active{% endif %}"
+          data-scope="cards"
+          aria-pressed="{{ 'true' if simulation_scope == 'cards' else 'false' }}"
+        >카드 항목</button>
+        <button
+          type="button"
+          class="simulation-scope-tab{% if simulation_scope == 'all' %} active{% endif %}"
+          data-scope="all"
+          aria-pressed="{{ 'true' if simulation_scope == 'all' else 'false' }}"
+        >증시 포함</button>
+      </div>
+      <label class="simulation-label" for="simulation-start-date">시작일</label>
+      <input
+        type="date"
+        id="simulation-start-date"
+        name="start_date"
+        value="{{ simulation_start_date }}"
+        max="{{ simulation_max_date }}"
+        required
+      >
+      <button type="submit" class="btn btn-primary" id="simulation-run-btn">분석</button>
+    </form>
+  </div>
+
+  <p class="simulation-summary" id="simulation-summary">시작일을 선택하고 분석을 실행하세요.</p>
+
+  <div class="simulation-results" id="simulation-results" hidden>
+    <div class="simulation-result-block">
+      <h3 class="simulation-result-title up">수익률 TOP 3</h3>
+      <div class="simulation-table-wrap">
+        <table class="simulation-table">
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>자산</th>
+              <th>카테고리</th>
+              <th>시작가</th>
+              <th>현재가</th>
+              <th>수익률</th>
+            </tr>
+          </thead>
+          <tbody id="simulation-top3"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="simulation-result-block">
+      <h3 class="simulation-result-title down">수익률 BOTTOM 3</h3>
+      <div class="simulation-table-wrap">
+        <table class="simulation-table">
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>자산</th>
+              <th>카테고리</th>
+              <th>시작가</th>
+              <th>현재가</th>
+              <th>수익률</th>
+            </tr>
+          </thead>
+          <tbody id="simulation-bottom3"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <details class="simulation-all-details">
+      <summary>전체 순위 보기</summary>
+      <div class="simulation-table-wrap">
+        <table class="simulation-table">
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>자산</th>
+              <th>카테고리</th>
+              <th>기준일</th>
+              <th>수익률</th>
+            </tr>
+          </thead>
+          <tbody id="simulation-all"></tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+
+  <div class="modal-overlay" id="simulation-coverage-modal" hidden>
+    <div
+      class="modal-dialog simulation-coverage-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="simulation-coverage-modal-title"
+    >
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="simulation-coverage-modal-title">포함 범위</h3>
+          <p class="simulation-coverage-desc" id="simulation-coverage-desc">{{ simulation_coverage.description }}</p>
+        </div>
+        <button type="button" class="modal-close" id="simulation-coverage-close" aria-label="닫기">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="simulation-coverage-groups" id="simulation-coverage-groups"></div>
+        <p class="simulation-coverage-note" id="simulation-coverage-note">{{ simulation_coverage.excluded_note }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script type="application/json" id="simulation-coverage-data">{{ simulation_coverage | tojson }}</script>

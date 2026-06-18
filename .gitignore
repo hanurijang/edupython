@@ -48,5 +48,12 @@ cache/
 data/raw/
 data/cache/
 
+# economy 앱 사용자 로컬 저장
+application/economy/data/favorites/*
+!application/economy/data/favorites/.gitkeep
+application/economy/data/custom_cards/*
+!application/economy/data/custom_cards/.gitkeep
+application/economy/cache/
+
 # 로그
 *.log

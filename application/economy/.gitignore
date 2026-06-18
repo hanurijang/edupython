@@ -1,0 +1,8 @@
+# 사용자 로컬 저장 (즐겨찾기 · 추가 카드) — push 제외
+data/favorites/*
+!data/favorites/.gitkeep
+data/custom_cards/*
+!data/custom_cards/.gitkeep
+
+# 런타임 캐시
+cache/

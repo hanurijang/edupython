@@ -1,0 +1,615 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% include 'partials/category_tabs.html' %}
+{% if current_category == 'favorites' %}
+{% include 'partials/favorites_panel.html' %}
+{% include 'partials/indicator_cards.html' %}
+{% elif current_category == 'simulation' %}
+{% include 'partials/simulation_panel.html' %}
+{% else %}
+{% include 'partials/indicator_cards.html' %}
+{% include 'partials/add_card_modal.html' %}
+{% endif %}
+
+<section class="chart-panel" id="single-chart-panel"{% if current_category in ['favorites', 'simulation'] %} hidden{% endif %}>
+  <div class="chart-toolbar">
+    <h2 class="chart-title" id="chart-title">지표를 선택하세요</h2>
+    <div class="period-tabs" id="period-tabs">
+      <button type="button" class="period-tab" data-period="1m">1M</button>
+      <button type="button" class="period-tab" data-period="3m">3M</button>
+      <button type="button" class="period-tab" data-period="6m">6M</button>
+      <button type="button" class="period-tab active" data-period="1y">1Y</button>
+      <button type="button" class="period-tab" data-period="3y">3Y</button>
+      <button type="button" class="period-tab" data-period="5y">5Y</button>
+    </div>
+  </div>
+  <div id="main-chart"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.__ECONOMY_FAVORITES__ = {{ favorite_ids | tojson }};
+window.__ECONOMY_CATEGORY__ = {{ current_category | tojson }};
+window.__ECONOMY_CUSTOMIZABLE__ = {{ customizable_categories | default([]) | tojson }};
+</script>
+<script>
+(function () {
+  const favoriteIds = new Set(window.__ECONOMY_FAVORITES__ || []);
+  const currentCategory = window.__ECONOMY_CATEGORY__ || 'fx';
+  const customizableCategories = new Set(window.__ECONOMY_CUSTOMIZABLE__ || []);
+
+  const cards = () => document.querySelectorAll('.indicator-card[data-id]');
+  const chartEl = document.getElementById('main-chart');
+  const chartTitle = document.getElementById('chart-title');
+  const periodTabs = document.querySelectorAll('#period-tabs .period-tab');
+  const singleChartPanel = document.getElementById('single-chart-panel');
+  const favoritesPanel = document.getElementById('favorites-panel');
+  const favoritesSummary = document.getElementById('favorites-summary');
+  const favoritesChips = document.getElementById('favorites-chips');
+  const favoritesPeriodTabs = document.querySelectorAll('#favorites-period-tabs .period-tab');
+  const compareChartEl = document.getElementById('favorites-compare-chart');
+  const corrChartEl = document.getElementById('favorites-corr-chart');
+  const correlationPairs = document.getElementById('correlation-pairs');
+
+  let selectedId = null;
+  let selectedPeriod = '1y';
+  let favoritesPeriod = '1y';
+
+  const plotlyConfig = { responsive: true, displayModeBar: false, locale: 'ko' };
+
+  function applyKoreanDateLayout(layout) {
+    const next = layout || {};
+    next.autosize = true;
+    next.xaxis = next.xaxis || {};
+    if (!next.xaxis.type) next.xaxis.type = 'date';
+    if (!next.xaxis.tickformat) next.xaxis.tickformat = '%Y.%m.%d';
+    if (!next.xaxis.hoverformat) next.xaxis.hoverformat = '%Y년 %m월 %d일';
+    return next;
+  }
+
+  function updateFavoritesTabCount() {
+    const countEl = document.querySelector('.category-tab-favorites .category-tab-count');
+    if (countEl) countEl.textContent = `(${favoriteIds.size})`;
+  }
+
+  function updateFavoriteButtons() {
+    document.querySelectorAll('.favorite-btn').forEach((btn) => {
+      const active = favoriteIds.has(btn.dataset.id);
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.querySelector('.favorite-icon').textContent = active ? '★' : '☆';
+    });
+  }
+
+  function renderFavoriteChips(items) {
+    if (!favoritesChips) return;
+    favoritesChips.innerHTML = '';
+    items.forEach((item) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'favorite-chip';
+      chip.dataset.id = item.id;
+      chip.innerHTML = `<span>${item.name}</span><span class="favorite-chip-remove" aria-hidden="true">×</span>`;
+      chip.addEventListener('click', () => toggleFavorite(item.id));
+      favoritesChips.appendChild(chip);
+    });
+  }
+
+  async function toggleFavorite(id) {
+    const isActive = favoriteIds.has(id);
+    const res = await fetch(isActive ? `/api/favorites/${encodeURIComponent(id)}` : '/api/favorites', {
+      method: isActive ? 'DELETE' : 'POST',
+      headers: isActive ? {} : { 'Content-Type': 'application/json' },
+      body: isActive ? undefined : JSON.stringify({ id }),
+    });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    favoriteIds.clear();
+    (data.ids || []).forEach((item) => favoriteIds.add(item));
+    updateFavoriteButtons();
+    updateFavoritesTabCount();
+
+    if (currentCategory === 'favorites') {
+      if (!isActive) {
+        document.querySelector(`.indicator-card[data-id="${id}"]`)?.remove();
+      }
+      await refreshFavoritesPanel();
+      if (favoriteIds.size === 0) {
+        window.location.href = '/?category=fx';
+      }
+    }
+  }
+
+  async function loadChart(id, period) {
+    if (!id || !chartEl) return;
+    chartTitle.textContent = '불러오는 중…';
+    try {
+      const res = await fetch(`/api/chart/${encodeURIComponent(id)}?period=${encodeURIComponent(period)}`);
+      if (!res.ok) throw new Error('chart fetch failed');
+      const data = await res.json();
+      chartTitle.textContent = data.series?.name || id;
+      const layout = applyKoreanDateLayout(data.chart.layout || {});
+      await Plotly.react(chartEl, data.chart.data || [], layout, plotlyConfig);
+    } catch (err) {
+      chartTitle.textContent = '차트를 불러올 수 없습니다';
+      chartEl.innerHTML = '<div class="empty-state">데이터 조회에 실패했습니다.</div>';
+    }
+  }
+
+  function selectCard(card) {
+    cards().forEach((c) => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedId = card.dataset.id;
+    loadChart(selectedId, selectedPeriod);
+  }
+
+  async function refreshFavoritesPanel() {
+    if (!favoritesPanel || currentCategory !== 'favorites') return;
+
+    if (favoriteIds.size === 0) {
+      return;
+    }
+
+    favoritesSummary.textContent = `즐겨찾기 ${favoriteIds.size}개 · data/favorites/watchlist.json에 저장됩니다.`;
+
+    try {
+      const res = await fetch('/api/favorites');
+      if (!res.ok) return;
+      const data = await res.json();
+      renderFavoriteChips(data.indicators || []);
+    } catch (err) {
+      renderFavoriteChips([]);
+    }
+
+    if (favoriteIds.size >= 1) {
+      await loadFavoritesCompare(favoritesPeriod);
+    } else if (compareChartEl) {
+      compareChartEl.innerHTML = '<div class="empty-state">즐겨찾기 1개 이상 필요합니다.</div>';
+    }
+
+    if (favoriteIds.size >= 2) {
+      await loadFavoritesCorrelation(favoritesPeriod);
+    } else if (corrChartEl) {
+      corrChartEl.innerHTML = '<div class="empty-state">상관계수는 즐겨찾기 2개 이상 필요합니다.</div>';
+      if (correlationPairs) correlationPairs.innerHTML = '';
+    }
+  }
+
+  async function loadFavoritesCompare(period) {
+    if (!compareChartEl) return;
+    compareChartEl.innerHTML = '<div class="empty-state">불러오는 중…</div>';
+    try {
+      const res = await fetch(`/api/favorites/compare?period=${encodeURIComponent(period)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'compare failed');
+      const layout = applyKoreanDateLayout(data.chart.layout || {});
+      await Plotly.react(compareChartEl, data.chart.data || [], layout, plotlyConfig);
+    } catch (err) {
+      compareChartEl.innerHTML = '<div class="empty-state">비교 차트를 불러올 수 없습니다.</div>';
+    }
+  }
+
+  async function loadFavoritesCorrelation(period) {
+    if (!corrChartEl) return;
+    corrChartEl.innerHTML = '<div class="empty-state">불러오는 중…</div>';
+    try {
+      const res = await fetch(`/api/favorites/correlation?period=${encodeURIComponent(period)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'correlation failed');
+      const layout = data.chart.layout || {};
+      layout.autosize = true;
+      await Plotly.react(corrChartEl, data.chart.data || [], layout, plotlyConfig);
+
+      if (correlationPairs) {
+        correlationPairs.innerHTML = '';
+        (data.correlation?.pairs || []).slice(0, 6).forEach((pair) => {
+          const li = document.createElement('li');
+          li.textContent = `${pair.a} · ${pair.b}: ${pair.value >= 0 ? '+' : ''}${pair.value.toFixed(2)}`;
+          correlationPairs.appendChild(li);
+        });
+      }
+    } catch (err) {
+      corrChartEl.innerHTML = '<div class="empty-state">상관계수를 불러올 수 없습니다.</div>';
+      if (correlationPairs) correlationPairs.innerHTML = '';
+    }
+  }
+
+  document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('.custom-remove-btn');
+    if (removeBtn) {
+      event.stopPropagation();
+      removeCustomCard(removeBtn.dataset.id);
+      return;
+    }
+
+    const favoriteBtn = event.target.closest('.favorite-btn');
+    if (favoriteBtn) {
+      event.stopPropagation();
+      toggleFavorite(favoriteBtn.dataset.id);
+      return;
+    }
+
+    const card = event.target.closest('.indicator-card[data-id]');
+    if (card) selectCard(card);
+  });
+
+  periodTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      periodTabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      selectedPeriod = tab.dataset.period;
+      if (selectedId) loadChart(selectedId, selectedPeriod);
+    });
+  });
+
+  favoritesPeriodTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      favoritesPeriodTabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      favoritesPeriod = tab.dataset.period;
+      loadFavoritesCompare(favoritesPeriod);
+      if (favoriteIds.size >= 2) loadFavoritesCorrelation(favoritesPeriod);
+    });
+  });
+
+  if (currentCategory === 'favorites') {
+    refreshFavoritesPanel();
+  } else if (currentCategory !== 'simulation') {
+    const firstCard = document.querySelector('.indicator-card[data-id]:not(.has-error)');
+    if (firstCard) selectCard(firstCard);
+  }
+
+  updateFavoriteButtons();
+  updateFavoritesTabCount();
+
+  if (currentCategory === 'simulation') {
+    initSimulation();
+  } else if (customizableCategories.has(currentCategory)) {
+    initCustomCards();
+  }
+
+  const ADD_CARD_LABELS = {
+    kr_market: '한국 증시 종목',
+    etf_kr: '한국 ETF',
+    etf_us: '미국 ETF',
+  };
+
+  let addCardSearchTimer = null;
+
+  async function removeCustomCard(id) {
+    if (!customizableCategories.has(currentCategory)) return;
+    const res = await fetch(
+      `/api/custom-cards/${encodeURIComponent(currentCategory)}/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) return;
+    window.location.reload();
+  }
+
+  async function searchCustomCards(query) {
+    const status = document.getElementById('add-card-status');
+    const resultsEl = document.getElementById('add-card-results');
+    if (!status || !resultsEl) return;
+
+    if (query.trim().length < 2) {
+      status.textContent = '2글자 이상 입력하면 검색됩니다.';
+      resultsEl.innerHTML = '';
+      return;
+    }
+
+    status.textContent = '검색 중…';
+    try {
+      const res = await fetch(
+        `/api/custom-cards/${encodeURIComponent(currentCategory)}/search?q=${encodeURIComponent(query)}`
+      );
+      const data = await res.json();
+      const results = data.results || [];
+      if (!results.length) {
+        status.textContent = '검색 결과가 없습니다.';
+        resultsEl.innerHTML = '';
+        return;
+      }
+      status.textContent = `${results.length}건`;
+      resultsEl.innerHTML = '';
+      results.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'add-card-result';
+        li.innerHTML = `
+          <div>
+            <div class="add-card-result-name">${item.name}</div>
+            <div class="add-card-result-symbol">${item.symbol}</div>
+          </div>
+          <button type="button" class="btn btn-primary add-card-result-btn">추가</button>
+        `;
+        li.querySelector('.add-card-result-btn').addEventListener('click', async () => {
+          const addRes = await fetch(`/api/custom-cards/${encodeURIComponent(currentCategory)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: item.symbol, name: item.name }),
+          });
+          const addData = await addRes.json();
+          if (!addRes.ok) {
+            status.textContent = addData.error || '추가에 실패했습니다.';
+            return;
+          }
+          window.location.reload();
+        });
+        resultsEl.appendChild(li);
+      });
+    } catch (_) {
+      status.textContent = '검색에 실패했습니다.';
+      resultsEl.innerHTML = '';
+    }
+  }
+
+  function openAddCardModal() {
+    const modal = document.getElementById('add-card-modal');
+    const title = document.getElementById('add-card-modal-title');
+    const desc = document.getElementById('add-card-modal-desc');
+    const search = document.getElementById('add-card-search');
+    const status = document.getElementById('add-card-status');
+    const results = document.getElementById('add-card-results');
+    if (!modal) return;
+
+    if (title) title.textContent = `${ADD_CARD_LABELS[currentCategory] || '카드'} 추가`;
+    if (desc) {
+      desc.textContent = currentCategory === 'etf_us'
+        ? '티커 또는 이름으로 검색하세요. (예: SPY, QQQ)'
+        : '종목명 또는 코드로 검색하세요.';
+    }
+    if (search) search.value = '';
+    if (status) status.textContent = '2글자 이상 입력하면 검색됩니다.';
+    if (results) results.innerHTML = '';
+
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    search?.focus();
+  }
+
+  function closeAddCardModal() {
+    const modal = document.getElementById('add-card-modal');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function initCustomCards() {
+    const openBtn = document.getElementById('add-custom-card-btn');
+    const modal = document.getElementById('add-card-modal');
+    const closeBtn = document.getElementById('add-card-modal-close');
+    const search = document.getElementById('add-card-search');
+    if (!openBtn || !modal) return;
+
+    openBtn.addEventListener('click', openAddCardModal);
+    closeBtn?.addEventListener('click', closeAddCardModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeAddCardModal();
+    });
+
+    const form = document.getElementById('add-card-form');
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      searchCustomCards(search?.value || '');
+    });
+
+    search?.addEventListener('input', () => {
+      clearTimeout(addCardSearchTimer);
+      addCardSearchTimer = setTimeout(() => searchCustomCards(search.value), 250);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hidden) closeAddCardModal();
+    });
+  }
+
+  function formatPct(value) {
+    if (value === null || value === undefined) return '-';
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${Number(value).toFixed(2)}%`;
+  }
+
+  function renderSimulationRows(tbody, rows, options = {}) {
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    rows.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      if (options.compact) {
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${row.name}</td>
+          <td>${row.category_label || row.category}</td>
+          <td>${row.start_date || '-'}</td>
+          <td class="simulation-return ${row.direction}">${formatPct(row.return_pct)}</td>
+        `;
+      } else {
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${row.name}</td>
+          <td>${row.category_label || row.category}</td>
+          <td>${row.start_price ?? '-'}</td>
+          <td>${row.end_price ?? '-'}</td>
+          <td class="simulation-return ${row.direction}">${formatPct(row.return_pct)}</td>
+        `;
+      }
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderSimulationCoverage(coverage) {
+    if (!coverage) return;
+    const countEl = document.getElementById('simulation-coverage-count');
+    const descEl = document.getElementById('simulation-coverage-desc');
+    const noteEl = document.getElementById('simulation-coverage-note');
+    const groupsEl = document.getElementById('simulation-coverage-groups');
+    if (!groupsEl) return;
+
+    if (countEl) countEl.textContent = `${coverage.total_count}개`;
+    if (descEl) descEl.textContent = coverage.description || '';
+    if (noteEl) noteEl.textContent = coverage.excluded_note || '';
+
+    groupsEl.innerHTML = '';
+    (coverage.groups || []).forEach((group) => {
+      const details = document.createElement('details');
+      details.className = 'simulation-coverage-group';
+      details.open = true;
+
+      const summary = document.createElement('summary');
+      summary.textContent = `${group.label} (${group.count})`;
+      details.appendChild(summary);
+
+      const renderList = (items) => {
+        const ul = document.createElement('ul');
+        ul.className = 'simulation-coverage-list';
+        items.forEach((item) => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <span class="simulation-coverage-name">${item.name}</span>
+            <span class="simulation-coverage-symbol">${item.symbol}</span>
+          `;
+          ul.appendChild(li);
+        });
+        return ul;
+      };
+
+      if (group.subsections) {
+        group.subsections.forEach((section) => {
+          const block = document.createElement('div');
+          block.className = 'simulation-coverage-subsection';
+          const title = document.createElement('p');
+          title.className = 'simulation-coverage-subtitle';
+          title.textContent = `${section.label} (${section.count})`;
+          block.appendChild(title);
+          block.appendChild(renderList(section.items || []));
+          details.appendChild(block);
+        });
+      } else {
+        details.appendChild(renderList(group.items || []));
+      }
+
+      groupsEl.appendChild(details);
+    });
+  }
+
+  async function loadSimulationCoverage(scope) {
+    try {
+      const res = await fetch(`/api/simulation/coverage?scope=${encodeURIComponent(scope)}`);
+      const data = await res.json();
+      if (res.ok) renderSimulationCoverage(data);
+    } catch (_) {
+      /* coverage is optional UI */
+    }
+  }
+
+  function openSimulationCoverageModal() {
+    const modal = document.getElementById('simulation-coverage-modal');
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSimulationCoverageModal() {
+    const modal = document.getElementById('simulation-coverage-modal');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function initSimulationCoverageModal() {
+    const modal = document.getElementById('simulation-coverage-modal');
+    const openBtn = document.getElementById('simulation-coverage-btn');
+    const closeBtn = document.getElementById('simulation-coverage-close');
+    if (!modal || !openBtn) return;
+
+    openBtn.addEventListener('click', openSimulationCoverageModal);
+    closeBtn?.addEventListener('click', closeSimulationCoverageModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeSimulationCoverageModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hidden) closeSimulationCoverageModal();
+    });
+  }
+
+  async function runSimulation(startDate, scope) {
+    const summary = document.getElementById('simulation-summary');
+    const results = document.getElementById('simulation-results');
+    const runBtn = document.getElementById('simulation-run-btn');
+    if (!summary || !results) return;
+
+    runBtn.disabled = true;
+    summary.textContent = '수익률을 계산하는 중…';
+    results.hidden = true;
+
+    try {
+      const res = await fetch(
+        `/api/simulation?start_date=${encodeURIComponent(startDate)}&scope=${encodeURIComponent(scope)}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'simulation failed');
+
+      summary.textContent = `[${data.scope_label}] ${data.scope_description} · ${data.start_date} → ${data.end_date} · ${data.evaluated}/${data.total_assets}개`;
+      if (data.coverage) renderSimulationCoverage(data.coverage);
+      renderSimulationRows(document.getElementById('simulation-top3'), data.top3 || []);
+      renderSimulationRows(document.getElementById('simulation-bottom3'), data.bottom3 || []);
+      renderSimulationRows(document.getElementById('simulation-all'), data.all || [], { compact: true });
+      results.hidden = false;
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('category', 'simulation');
+      url.searchParams.set('start_date', startDate);
+      url.searchParams.set('scope', scope);
+      window.history.replaceState({}, '', url);
+    } catch (err) {
+      summary.textContent = err.message || '시뮬레이션에 실패했습니다.';
+    } finally {
+      runBtn.disabled = false;
+    }
+  }
+
+  function initSimulation() {
+    const form = document.getElementById('simulation-form');
+    const input = document.getElementById('simulation-start-date');
+    const scopeTabs = document.querySelectorAll('#simulation-scope-tabs .simulation-scope-tab');
+    if (!form || !input) return;
+
+    let simulationScope = new URL(window.location.href).searchParams.get('scope') || 'all';
+    if (!['cards', 'all'].includes(simulationScope)) simulationScope = 'all';
+
+    function setScope(scope) {
+      simulationScope = scope;
+      scopeTabs.forEach((tab) => {
+        const active = tab.dataset.scope === scope;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      loadSimulationCoverage(scope);
+      runSimulation(input.value, simulationScope);
+    }
+
+    scopeTabs.forEach((tab) => {
+      tab.addEventListener('click', () => setScope(tab.dataset.scope));
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      runSimulation(input.value, simulationScope);
+    });
+
+    initSimulationCoverageModal();
+    const initialCoverage = document.getElementById('simulation-coverage-data');
+    if (initialCoverage?.textContent) {
+      try {
+        renderSimulationCoverage(JSON.parse(initialCoverage.textContent));
+      } catch (_) {
+        /* ignore invalid bootstrap payload */
+      }
+    }
+
+    setScope(simulationScope);
+  }
+})();
+</script>
+{% endblock %}
